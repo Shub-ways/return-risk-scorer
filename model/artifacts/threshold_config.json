@@ -1,0 +1,7 @@
+{
+  "model_name": "logistic_regression",
+  "flag_threshold_t1": 0.44658517801544423,
+  "deny_threshold_t2": 0.9998931712047917,
+  "target_recall": 0.85,
+  "target_precision": 0.85
+}
