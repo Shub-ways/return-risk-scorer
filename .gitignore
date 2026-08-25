@@ -6,5 +6,4 @@ venv/
 data/returns_dataset.csv
 model/artifacts/*.pkl
 audit/decisions.jsonl
-eval/report.md
 .pytest_cache/

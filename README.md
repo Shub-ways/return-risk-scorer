@@ -18,6 +18,7 @@ pip install -r requirements.txt
 python data/generate_synthetic_data.py   # generate the labeled dataset
 python -m model.train                    # train + select model, tune thresholds
 python -m eval.evaluate                  # held-out precision/recall + cost report
+python -m eval.threshold_sensitivity     # threshold trade-off sweep (appends to eval/report.md)
 pytest tests/                            # decision-boundary unit tests
 
 streamlit run app.py                     # review queue / metrics / audit trail UI
@@ -27,7 +28,7 @@ Optional: copy `.env.example` to `.env` and set `GEMINI_API_KEY` to get live LLM
 
 ## Repo layout
 
-```
+```text
 data/       synthetic labeled returns dataset generator
 model/      feature engineering, training, model comparison, threshold tuning
 scoring/    pure scoring function + LLM explanation layer
