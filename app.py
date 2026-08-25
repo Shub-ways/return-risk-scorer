@@ -18,6 +18,15 @@ st.set_page_config(page_title="Return-Risk Scorer", layout="wide")
 st.title("Return-Risk Scorer")
 st.caption("AI Risk Manager — Razorpay AI Buildathon | risk score & routing come from a transparent classifier; the LLM only explains the decision, it never makes it.")
 
+with st.sidebar:
+    st.header("Session")
+    reviewer_name = st.text_input("Reviewer name", value="demo_reviewer")
+    show_ground_truth = st.checkbox(
+        "Show ground truth (synthetic data)", value=False,
+        help="This demo runs on labeled synthetic data, so we know the real answer. "
+             "Off by default to simulate a real blind review; turn on to check the system's calls.",
+    )
+
 if "batch" not in st.session_state:
     st.session_state.batch = None
 if "results" not in st.session_state:
@@ -57,6 +66,12 @@ with tab_queue:
             m1.metric("Auto-approved", int(counts.get("auto_approve", 0)))
             m2.metric("Held for review", int(counts.get("hold_for_review", 0)))
             m3.metric("Auto-denied", int(counts.get("auto_deny", 0)))
+            if counts.get("auto_deny", 0) == 0:
+                st.caption(
+                    "Auto-deny is empty by design, not a bug: on this dataset no score band reaches the "
+                    "precision bar required to auto-deny (see 'Honest caveats' in Batch Metrics), so every "
+                    "flagged return goes to a human instead of being denied automatically."
+                )
 
         batch_id = str(batch["return_id"].tolist())
         if st.session_state.auto_logged_batch_id != batch_id:
@@ -84,15 +99,36 @@ with tab_queue:
             with st.container(border=True):
                 c1, c2 = st.columns([4, 1])
                 with c1:
-                    st.markdown(f"**{rid}** — risk score `{r['risk_score']:.2f}` — {row['item_category']}, order value {row['order_value']:.0f}, reason: {row['return_reason_code']}")
+                    label = f"**{rid}** — risk score `{r['risk_score']:.2f}` — {row['item_category']}, order value {row['order_value']:.0f}, reason: {row['return_reason_code']}"
+                    if show_ground_truth:
+                        truth = "FRAUD" if row["label_is_fraudulent_return"] == 1 else "legit"
+                        label += f" — *ground truth: {truth}*"
+                    st.markdown(label)
                     st.write(explanation)
                 with c2:
                     if st.button("Approve", key=f"approve_{rid}"):
-                        log_decision(rid, r["risk_score"], "approved", "manual", r["model_name"], explanation, reviewer="demo_reviewer")
+                        log_decision(rid, r["risk_score"], "approved", "manual", r["model_name"], explanation, reviewer=reviewer_name)
                         st.rerun()
                     if st.button("Deny", key=f"deny_{rid}"):
-                        log_decision(rid, r["risk_score"], "denied", "manual", r["model_name"], explanation, reviewer="demo_reviewer")
+                        log_decision(rid, r["risk_score"], "denied", "manual", r["model_name"], explanation, reviewer=reviewer_name)
                         st.rerun()
+
+        reviewed_this_batch = [
+            e for e in read_log()
+            if e["decision_source"] == "manual" and e["return_id"] in set(batch["return_id"])
+        ]
+        if reviewed_this_batch:
+            st.subheader("Reviewed this batch")
+            rows = []
+            for e in reviewed_this_batch:
+                row = batch[batch["return_id"] == e["return_id"]].iloc[0]
+                entry = {"return_id": e["return_id"], "reviewer_decision": e["decision"], "reviewer": e["reviewer"]}
+                if show_ground_truth:
+                    truth = "fraud" if row["label_is_fraudulent_return"] == 1 else "legit"
+                    entry["ground_truth"] = truth
+                    entry["correct"] = (e["decision"] == "denied") == (truth == "fraud")
+                rows.append(entry)
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
 with tab_metrics:
     st.subheader("Held-out evaluation")
